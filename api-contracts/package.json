@@ -1,0 +1,17 @@
+{
+  "name": "finance-tracker-api-contracts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Contratos OpenAPI 3.1 dos serviços do finance-tracker (API First).",
+  "scripts": {
+    "lint": "spectral lint auth-service.yaml accounts-service.yaml transactions-service.yaml",
+    "docs": "redocly preview-docs accounts-service.yaml",
+    "codegen:java:accounts": "openapi-generator-cli generate -i accounts-service.yaml -g spring -o ../accounts-service/target/generated-sources/openapi --additional-properties=interfaceOnly=true,useTags=true",
+    "codegen:ts:client": "openapi-generator-cli generate -i transactions-service.yaml -g typescript-fetch -o ../frontend/src/api/transactions"
+  },
+  "devDependencies": {
+    "@stoplight/spectral-cli": "^6.11.1",
+    "@redocly/cli": "^1.25.11",
+    "@openapitools/openapi-generator-cli": "^2.13.4"
+  }
+}

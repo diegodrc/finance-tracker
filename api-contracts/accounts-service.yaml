@@ -1,0 +1,337 @@
+openapi: 3.1.0
+info:
+  title: Accounts Service API
+  version: "1.0.0"
+  description: >
+    Gestão de contas bancárias e categorias do usuário autenticado.
+servers:
+  - url: /api/v1
+tags:
+  - name: Contas
+  - name: Categorias
+security:
+  - bearerAuth: []
+paths:
+  /contas:
+    get:
+      operationId: listarContas
+      tags: [Contas]
+      summary: Lista as contas bancárias do usuário autenticado.
+      parameters:
+        - $ref: "./shared/pagination.yaml#/components/parameters/PageParam"
+        - $ref: "./shared/pagination.yaml#/components/parameters/SizeParam"
+        - $ref: "./shared/pagination.yaml#/components/parameters/SortParam"
+        - name: ativo
+          in: query
+          description: Filtra por contas ativas/inativas (soft delete). Por padrão retorna apenas ativas.
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Página de contas bancárias.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageContaBancaria"
+        "401":
+          $ref: "./shared/errors.yaml#/components/responses/Unauthorized"
+
+    post:
+      operationId: criarConta
+      tags: [Contas]
+      summary: Cria uma nova conta bancária.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContaBancariaRequest"
+      responses:
+        "201":
+          description: Conta criada.
+          headers:
+            Location:
+              schema: { type: string, format: uri }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContaBancaria"
+        "400":
+          $ref: "./shared/errors.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./shared/errors.yaml#/components/responses/Unauthorized"
+
+  /contas/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: obterConta
+      tags: [Contas]
+      summary: Obtém uma conta bancária pelo id.
+      responses:
+        "200":
+          description: Conta encontrada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContaBancaria"
+        "401":
+          $ref: "./shared/errors.yaml#/components/responses/Unauthorized"
+        "404":
+          $ref: "./shared/errors.yaml#/components/responses/NotFound"
+
+    put:
+      operationId: atualizarConta
+      tags: [Contas]
+      summary: Atualiza uma conta bancária existente.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContaBancariaRequest"
+      responses:
+        "200":
+          description: Conta atualizada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContaBancaria"
+        "400":
+          $ref: "./shared/errors.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./shared/errors.yaml#/components/responses/Unauthorized"
+        "404":
+          $ref: "./shared/errors.yaml#/components/responses/NotFound"
+
+    delete:
+      operationId: removerConta
+      tags: [Contas]
+      summary: Remove (soft delete) uma conta bancária. Transações vinculadas são preservadas.
+      responses:
+        "204":
+          description: Conta desativada com sucesso.
+        "401":
+          $ref: "./shared/errors.yaml#/components/responses/Unauthorized"
+        "404":
+          $ref: "./shared/errors.yaml#/components/responses/NotFound"
+
+  /categorias:
+    get:
+      operationId: listarCategorias
+      tags: [Categorias]
+      summary: Lista categorias, opcionalmente filtradas por natureza.
+      parameters:
+        - name: natureza
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/Natureza"
+        - $ref: "./shared/pagination.yaml#/components/parameters/PageParam"
+        - $ref: "./shared/pagination.yaml#/components/parameters/SizeParam"
+        - $ref: "./shared/pagination.yaml#/components/parameters/SortParam"
+      responses:
+        "200":
+          description: Página de categorias.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageCategoria"
+        "401":
+          $ref: "./shared/errors.yaml#/components/responses/Unauthorized"
+
+    post:
+      operationId: criarCategoria
+      tags: [Categorias]
+      summary: Cria uma nova categoria.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoriaRequest"
+      responses:
+        "201":
+          description: Categoria criada.
+          headers:
+            Location:
+              schema: { type: string, format: uri }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Categoria"
+        "400":
+          $ref: "./shared/errors.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./shared/errors.yaml#/components/responses/Unauthorized"
+
+  /categorias/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      operationId: atualizarCategoria
+      tags: [Categorias]
+      summary: Atualiza uma categoria existente.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoriaRequest"
+      responses:
+        "200":
+          description: Categoria atualizada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Categoria"
+        "400":
+          $ref: "./shared/errors.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./shared/errors.yaml#/components/responses/Unauthorized"
+        "404":
+          $ref: "./shared/errors.yaml#/components/responses/NotFound"
+
+    delete:
+      operationId: removerCategoria
+      tags: [Categorias]
+      summary: >
+        Remove uma categoria. Transações vinculadas não são apagadas: passam
+        a ficar sem categoria (categoriaId = null).
+      responses:
+        "204":
+          description: Categoria removida com sucesso.
+        "401":
+          $ref: "./shared/errors.yaml#/components/responses/Unauthorized"
+        "404":
+          $ref: "./shared/errors.yaml#/components/responses/NotFound"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Natureza:
+      type: string
+      enum: [CREDITO, DEBITO]
+      description: Natureza da categoria — determina que tipos de transação ela aceita.
+
+    TipoConta:
+      type: string
+      enum: [CORRENTE, POUPANCA, CARTEIRA, INVESTIMENTO]
+
+    ContaBancaria:
+      type: object
+      required: [id, banco, tipo, valorInicial, cor, ativo, criadoEm, atualizadoEm]
+      properties:
+        id:
+          type: string
+          format: uuid
+        banco:
+          type: string
+          example: "Nubank"
+        tipo:
+          $ref: "#/components/schemas/TipoConta"
+        valorInicial:
+          type: string
+          format: decimal
+          description: >
+            Valor inicial da conta. Representado como string decimal
+            (NUMERIC(19,2) no banco / BigDecimal no Java) para não perder
+            precisão — nunca usar float/double para dinheiro.
+          example: "1500.00"
+        cor:
+          type: string
+          pattern: "^#[0-9A-Fa-f]{6}$"
+          description: Cor hexadecimal usada como identidade visual da conta no app.
+          example: "#8A05BE"
+        ativo:
+          type: boolean
+          description: false quando a conta foi removida via soft delete.
+        criadoEm:
+          type: string
+          format: date-time
+        atualizadoEm:
+          type: string
+          format: date-time
+
+    ContaBancariaRequest:
+      type: object
+      required: [banco, tipo, valorInicial, cor]
+      properties:
+        banco:
+          type: string
+          minLength: 1
+          maxLength: 80
+        tipo:
+          $ref: "#/components/schemas/TipoConta"
+        valorInicial:
+          type: string
+          format: decimal
+          example: "1500.00"
+        cor:
+          type: string
+          pattern: "^#[0-9A-Fa-f]{6}$"
+
+    PageContaBancaria:
+      allOf:
+        - $ref: "./shared/pagination.yaml#/components/schemas/PageMetadata"
+        - type: object
+          required: [content]
+          properties:
+            content:
+              type: array
+              items:
+                $ref: "#/components/schemas/ContaBancaria"
+
+    Categoria:
+      type: object
+      required: [id, nome, natureza, criadoEm]
+      properties:
+        id:
+          type: string
+          format: uuid
+        nome:
+          type: string
+          example: "Alimentação"
+        natureza:
+          $ref: "#/components/schemas/Natureza"
+        criadoEm:
+          type: string
+          format: date-time
+
+    CategoriaRequest:
+      type: object
+      required: [nome, natureza]
+      properties:
+        nome:
+          type: string
+          minLength: 1
+          maxLength: 60
+        natureza:
+          $ref: "#/components/schemas/Natureza"
+
+    PageCategoria:
+      allOf:
+        - $ref: "./shared/pagination.yaml#/components/schemas/PageMetadata"
+        - type: object
+          required: [content]
+          properties:
+            content:
+              type: array
+              items:
+                $ref: "#/components/schemas/Categoria"

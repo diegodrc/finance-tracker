@@ -1,0 +1,339 @@
+openapi: 3.1.0
+info:
+  title: Transactions Service API
+  version: "1.0.0"
+  description: >
+    Serviço de transações financeiras, implementado com CQRS/Event Sourcing:
+    o lado de comando (POST/PUT/DELETE /transacoes) grava eventos; o lado de
+    consulta (GET) lê de uma projeção otimizada para leitura. Este contrato
+    expõe apenas a superfície HTTP — a separação interna command/query não
+    vaza para o cliente.
+servers:
+  - url: /api/v1
+tags:
+  - name: Transações (Command)
+  - name: Transações (Query)
+  - name: Relatórios
+security:
+  - bearerAuth: []
+paths:
+  /transacoes:
+    post:
+      operationId: criarTransacao
+      tags: [Transações (Command)]
+      summary: Registra uma nova transação.
+      description: >
+        Requer o header `Idempotency-Key` para evitar duplicidade em caso de
+        reenvio (retry de rede, double-click). Reenviar a mesma chave com o
+        mesmo corpo retorna a transação já criada (200); reenviar a mesma
+        chave com corpo diferente retorna 409.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransacaoRequest"
+      responses:
+        "201":
+          description: Transação criada.
+          headers:
+            Location:
+              schema: { type: string, format: uri }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transacao"
+        "200":
+          description: Reenvio idempotente — transação já existente para esta chave e corpo.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transacao"
+        "400":
+          $ref: "./shared/errors.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./shared/errors.yaml#/components/responses/Unauthorized"
+        "404":
+          description: Conta ou categoria referenciada não existe.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "./shared/errors.yaml#/components/schemas/ProblemDetails"
+        "409":
+          description: Idempotency-Key já usada com um corpo de requisição diferente.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "./shared/errors.yaml#/components/schemas/ProblemDetails"
+
+    get:
+      operationId: listarTransacoes
+      tags: [Transações (Query)]
+      summary: Lista transações com filtros e paginação.
+      parameters:
+        - name: contaId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: categoriaId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: de
+          in: query
+          description: Data inicial (inclusive) do período, ISO-8601.
+          schema: { type: string, format: date }
+        - name: ate
+          in: query
+          description: Data final (inclusive) do período, ISO-8601.
+          schema: { type: string, format: date }
+        - name: tipo
+          in: query
+          schema:
+            $ref: "#/components/schemas/TipoTransacao"
+        - $ref: "./shared/pagination.yaml#/components/parameters/PageParam"
+        - $ref: "./shared/pagination.yaml#/components/parameters/SizeParam"
+        - $ref: "./shared/pagination.yaml#/components/parameters/SortParam"
+      responses:
+        "200":
+          description: Página de transações.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageTransacao"
+        "401":
+          $ref: "./shared/errors.yaml#/components/responses/Unauthorized"
+
+  /transacoes/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      operationId: atualizarTransacao
+      tags: [Transações (Command)]
+      summary: Atualiza uma transação existente.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransacaoRequest"
+      responses:
+        "200":
+          description: Transação atualizada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transacao"
+        "400":
+          $ref: "./shared/errors.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./shared/errors.yaml#/components/responses/Unauthorized"
+        "404":
+          $ref: "./shared/errors.yaml#/components/responses/NotFound"
+
+    delete:
+      operationId: removerTransacao
+      tags: [Transações (Command)]
+      summary: Remove uma transação.
+      responses:
+        "204":
+          description: Transação removida com sucesso.
+        "401":
+          $ref: "./shared/errors.yaml#/components/responses/Unauthorized"
+        "404":
+          $ref: "./shared/errors.yaml#/components/responses/NotFound"
+
+  /saldos:
+    get:
+      operationId: obterSaldos
+      tags: [Transações (Query)]
+      summary: Retorna o saldo consolidado e o saldo por conta.
+      responses:
+        "200":
+          description: Saldos calculados a partir da projeção de leitura.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaldosResponse"
+        "401":
+          $ref: "./shared/errors.yaml#/components/responses/Unauthorized"
+
+  /relatorios/por-categoria:
+    get:
+      operationId: obterRelatorioPorCategoria
+      tags: [Relatórios]
+      summary: Agrega valores por categoria dentro de um período, para um tipo (crédito ou débito).
+      parameters:
+        - name: de
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: ate
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: tipo
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/TipoTransacao"
+      responses:
+        "200":
+          description: Itens agregados por categoria, ordenados por valor total decrescente.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RelatorioCategoriaItem"
+        "400":
+          $ref: "./shared/errors.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./shared/errors.yaml#/components/responses/Unauthorized"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Chave única gerada pelo cliente para tornar o POST seguro contra reenvio.
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    TipoTransacao:
+      type: string
+      enum: [CREDITO, DEBITO]
+
+    Transacao:
+      type: object
+      required: [id, tipo, valor, contaId, data, criadoEm, atualizadoEm]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tipo:
+          $ref: "#/components/schemas/TipoTransacao"
+        valor:
+          type: string
+          format: decimal
+          description: >
+            Sempre positivo — o sinal (entrada/saída) vem do campo `tipo`,
+            nunca do valor numérico.
+          example: "89.90"
+        categoriaId:
+          type: [string, "null"]
+          format: uuid
+          description: Nulo quando a categoria original foi removida.
+        contaId:
+          type: string
+          format: uuid
+        data:
+          type: string
+          format: date
+          description: Data em que a transação ocorreu (sem horário).
+        descricao:
+          type: string
+          maxLength: 200
+        criadoEm:
+          type: string
+          format: date-time
+        atualizadoEm:
+          type: string
+          format: date-time
+
+    TransacaoRequest:
+      type: object
+      required: [tipo, valor, contaId, data]
+      properties:
+        tipo:
+          $ref: "#/components/schemas/TipoTransacao"
+        valor:
+          type: string
+          format: decimal
+          example: "89.90"
+        categoriaId:
+          type: [string, "null"]
+          format: uuid
+        contaId:
+          type: string
+          format: uuid
+        data:
+          type: string
+          format: date
+        descricao:
+          type: string
+          maxLength: 200
+
+    PageTransacao:
+      allOf:
+        - $ref: "./shared/pagination.yaml#/components/schemas/PageMetadata"
+        - type: object
+          required: [content]
+          properties:
+            content:
+              type: array
+              items:
+                $ref: "#/components/schemas/Transacao"
+
+    SaldoConta:
+      type: object
+      required: [contaId, banco, saldo]
+      properties:
+        contaId:
+          type: string
+          format: uuid
+        banco:
+          type: string
+          example: "Nubank"
+        saldo:
+          type: string
+          format: decimal
+          example: "2430.15"
+
+    SaldosResponse:
+      type: object
+      required: [saldoTotal, saldosPorConta]
+      properties:
+        saldoTotal:
+          type: string
+          format: decimal
+          example: "5120.40"
+        saldosPorConta:
+          type: array
+          items:
+            $ref: "#/components/schemas/SaldoConta"
+
+    RelatorioCategoriaItem:
+      type: object
+      required: [categoriaId, categoriaNome, total, percentual]
+      properties:
+        categoriaId:
+          type: [string, "null"]
+          format: uuid
+          description: Nulo agrupa as transações sem categoria.
+        categoriaNome:
+          type: string
+          example: "Alimentação"
+        total:
+          type: string
+          format: decimal
+          example: "845.30"
+        percentual:
+          type: number
+          format: double
+          description: Percentual do total do período representado por esta categoria.
+          example: 23.4

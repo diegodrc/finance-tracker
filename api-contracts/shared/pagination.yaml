@@ -1,0 +1,66 @@
+openapi: 3.1.0
+info:
+  title: Shared — Pagination
+  version: "1.0.0"
+  description: >
+    Parâmetros e schema de metadados de paginação compartilhados. Cada
+    serviço compõe seu próprio `Page<Recurso>` combinando estes metadados
+    com um array `content` do seu schema, via `allOf`.
+paths: {}
+components:
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      description: Número da página, começando em 0.
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    SizeParam:
+      name: size
+      in: query
+      description: Quantidade de itens por página.
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    SortParam:
+      name: sort
+      in: query
+      description: >
+        Campo(s) de ordenação no formato `campo,asc|desc`. Repetível para
+        ordenação por múltiplos campos.
+      required: false
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          type: string
+          example: "data,desc"
+  schemas:
+    PageMetadata:
+      type: object
+      required: [page, size, totalElements, totalPages]
+      properties:
+        page:
+          type: integer
+          description: Página atual (0-based).
+          example: 0
+        size:
+          type: integer
+          description: Tamanho de página solicitado.
+          example: 20
+        totalElements:
+          type: integer
+          format: int64
+          description: Total de elementos em todas as páginas.
+          example: 137
+        totalPages:
+          type: integer
+          description: Total de páginas disponíveis.
+          example: 7

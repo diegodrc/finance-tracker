@@ -1,0 +1,90 @@
+openapi: 3.1.0
+info:
+  title: Shared — Errors (RFC 7807)
+  version: "1.0.0"
+  description: >
+    Componentes de erro compartilhados por todos os serviços. Não é servido
+    como API própria — existe só para ser referenciado via $ref pelos outros
+    contratos (`shared/errors.yaml#/components/...`).
+paths: {}
+components:
+  schemas:
+    ProblemDetails:
+      type: object
+      description: >
+        Formato de erro padrão (RFC 7807 — application/problem+json).
+        Todo erro 4xx/5xx da API segue esta forma.
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: URI que identifica o tipo do problema.
+          example: "https://api.financetracker.dev/problems/validacao"
+        title:
+          type: string
+          description: Resumo curto e legível do tipo de erro.
+          example: "Erro de validação"
+        status:
+          type: integer
+          description: Código de status HTTP repetido no corpo, para conveniência.
+          example: 400
+        detail:
+          type: string
+          description: Explicação específica desta ocorrência do erro.
+          example: "O campo 'valor' deve ser maior que zero."
+        instance:
+          type: string
+          format: uri
+          description: URI da requisição que gerou o erro.
+          example: "https://api.financetracker.dev/api/v1/transacoes"
+        errors:
+          type: array
+          description: Detalhamento por campo, usado em erros de validação (400/422).
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field:
+                type: string
+                example: "valor"
+              message:
+                type: string
+                example: "deve ser maior que zero"
+  responses:
+    BadRequest:
+      description: Requisição malformada ou com dados inválidos.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    Unauthorized:
+      description: Credenciais ausentes, inválidas ou expiradas.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    Forbidden:
+      description: Usuário autenticado sem permissão para o recurso.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    NotFound:
+      description: Recurso não encontrado.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    Conflict:
+      description: "Conflito de estado (ex.: recurso duplicado, reuso de Idempotency-Key com corpo diferente)."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    UnprocessableEntity:
+      description: Sintaticamente válido, mas viola uma regra de negócio.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"

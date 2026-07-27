@@ -1,0 +1,187 @@
+openapi: 3.1.0
+info:
+  title: Auth Service API
+  version: "1.0.0"
+  description: >
+    Serviço responsável por cadastro, autenticação e emissão de tokens JWT
+    (access + refresh) usados pelos demais serviços.
+servers:
+  - url: /api/v1
+tags:
+  - name: Autenticação
+paths:
+  /auth/registro:
+    post:
+      operationId: registrarUsuario
+      tags: [Autenticação]
+      summary: Cadastra um novo usuário.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegistroRequest"
+      responses:
+        "201":
+          description: Usuário criado.
+          headers:
+            Location:
+              description: URI do recurso criado.
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Usuario"
+        "400":
+          $ref: "./shared/errors.yaml#/components/responses/BadRequest"
+        "409":
+          description: E-mail já cadastrado.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "./shared/errors.yaml#/components/schemas/ProblemDetails"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [Autenticação]
+      summary: Autentica um usuário e emite tokens.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Autenticação bem-sucedida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "400":
+          $ref: "./shared/errors.yaml#/components/responses/BadRequest"
+        "401":
+          description: E-mail ou senha inválidos.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "./shared/errors.yaml#/components/schemas/ProblemDetails"
+
+  /auth/refresh:
+    post:
+      operationId: renovarToken
+      tags: [Autenticação]
+      summary: Troca um refresh token válido por um novo par de tokens.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          description: Novo par de tokens emitido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "401":
+          $ref: "./shared/errors.yaml#/components/responses/Unauthorized"
+
+  /auth/me:
+    get:
+      operationId: obterUsuarioAutenticado
+      tags: [Autenticação]
+      summary: Retorna os dados do usuário autenticado.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Dados do usuário autenticado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Usuario"
+        "401":
+          $ref: "./shared/errors.yaml#/components/responses/Unauthorized"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Usuario:
+      type: object
+      required: [id, nome, email, criadoEm]
+      properties:
+        id:
+          type: string
+          format: uuid
+        nome:
+          type: string
+          example: "Diego Camargos"
+        email:
+          type: string
+          format: email
+        criadoEm:
+          type: string
+          format: date-time
+          description: Timestamp UTC de criação (auditoria).
+
+    RegistroRequest:
+      type: object
+      required: [nome, email, senha]
+      properties:
+        nome:
+          type: string
+          minLength: 2
+          maxLength: 120
+        email:
+          type: string
+          format: email
+        senha:
+          type: string
+          format: password
+          minLength: 8
+          description: Nunca retornado em nenhuma resposta.
+
+    LoginRequest:
+      type: object
+      required: [email, senha]
+      properties:
+        email:
+          type: string
+          format: email
+        senha:
+          type: string
+          format: password
+
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+
+    TokenResponse:
+      type: object
+      required: [accessToken, refreshToken, expiresIn, tokenType]
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        tokenType:
+          type: string
+          enum: [Bearer]
+          default: Bearer
+        expiresIn:
+          type: integer
+          description: Validade do access token em segundos.
+          example: 900

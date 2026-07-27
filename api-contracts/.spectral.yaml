@@ -1,0 +1,14 @@
+extends:
+  - spectral:oas
+
+rules:
+  # Todo endpoint documentado precisa de operationId (necessário pro
+  # openapi-generator nomear métodos de forma previsível).
+  operation-operationId: error
+  # RFC 7807: forçamos o content-type correto nas respostas de erro via
+  # revisão manual dos contratos; o restante do estilo vem do ruleset padrão.
+  info-contact: off
+  oas3-unused-component: warn
+  # summary já é obrigatório e descritivo em toda operação; description
+  # duplicada não agrega.
+  operation-description: off
